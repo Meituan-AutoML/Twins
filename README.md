@@ -35,7 +35,7 @@ We provide baseline Twins models pretrained on ImageNet 2012.
 ### Citation
 
 ```
-@article{chu2021ConditionalPE,
+@article{chu2021Twins,
 	title={Twins: Revisiting the Design of Spatial Attention in Vision Transformers},
 	author={Xiangxiang Chu and Zhi Tian and Yuqing Wang and Bo Zhang and Haibing Ren and Xiaolin Wei and Huaxia Xia and Chunhua Shen},
 	journal={preprint}
