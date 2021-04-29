@@ -14,13 +14,6 @@ We provide baseline Twins models pretrained on ImageNet 2012.
 
 | Name | Alias in paper | acc@1 | FLOPs(G)|#params (M) | url |
 | --- | --- | --- | --- | --- |--- |
-| PVT-Tiny | |  75.1 | 1.9 | 13.2 | |
-| PVT-Small | | 79.8 | 3.8 | 24.5 ||
-| PVT-Medium | | 81.2 | 6.7| 44.2 |  |
-| PVT-Large | | 81.7 |9.8 |61.4 | |
-| Swin-T | | 81.3 | 4.5 | 29 | |
-| Swin-S | | 83.0 | 8.7 | 50 | |
-| Swin-B | | 83.3 | 15.4 | 88 | |
 | PVT+CPVT-Small| Twins-PCPVT-S | 81.2 | 3.7 | 24.1 | [pcpvt_small.pth](https://drive.google.com/file/d/1TWIx_8M-4y6UOKtbCgm1v-UVQ-_lYe6X/view?usp=sharing)
 | PVT+CPVT-Base| Twins-PCPVT-B | 82.7 | 6.4 | 43.8 | [pcpvt_base.pth](https://drive.google.com/file/d/1BsD3ZRivvPsHoZB1AX-tbirFLtCln8ky/view?usp=sharing)
 | ALT-GVT-Small | Twins-SVT-S | 81.3 | 2.8| 24 | [alt_gvt_small.pth](https://drive.google.com/file/d/131SVOphM_-SaBytf4kWjo3ony5hpOt4S/view?usp=sharing)|
@@ -38,7 +31,8 @@ We provide baseline Twins models pretrained on ImageNet 2012.
 @article{chu2021Twins,
 	title={Twins: Revisiting the Design of Spatial Attention in Vision Transformers},
 	author={Xiangxiang Chu and Zhi Tian and Yuqing Wang and Bo Zhang and Haibing Ren and Xiaolin Wei and Huaxia Xia and Chunhua Shen},
-	journal={preprint}
+	journal={Arxiv preprint 2104.13840},
+	url={https://arxiv.org/pdf/2104.13840.pdf},
 	year={2021}
 }
 ```
