@@ -1,1 +1,3 @@
 *.pth
+.idea
+.DS_Store

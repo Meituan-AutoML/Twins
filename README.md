@@ -14,11 +14,12 @@ We provide baseline Twins models pretrained on ImageNet 2012.
 
 | Name | Alias in paper | acc@1 | FLOPs(G)|#params (M) | url |
 | --- | --- | --- | --- | --- |--- |
-| PVT+CPVT-Small| Twins-PCPVT-S | 81.2 | 3.7 | 24.1 | [pcpvt_small.pth](https://drive.google.com/file/d/1TWIx_8M-4y6UOKtbCgm1v-UVQ-_lYe6X/view?usp=sharing)
-| PVT+CPVT-Base| Twins-PCPVT-B | 82.7 | 6.4 | 43.8 | [pcpvt_base.pth](https://drive.google.com/file/d/1BsD3ZRivvPsHoZB1AX-tbirFLtCln8ky/view?usp=sharing)
-| ALT-GVT-Small | Twins-SVT-S | 81.3 | 2.8| 24 | [alt_gvt_small.pth](https://drive.google.com/file/d/131SVOphM_-SaBytf4kWjo3ony5hpOt4S/view?usp=sharing)|
-| ALT-GVT-Base | Twins-SVT-B| 83.1 | 8.3 | 56 | [alt_gvt_base.pth](https://drive.google.com/file/d/1s83To8xgDWY6Ad8VBP3Nx9gqY709rrGu/view?usp=sharing)|
-| ALT-GVT-Large | Twins-SVT-L | 83.3 | 14.8 | 99.2 |[alt_gvt_large.pth](https://drive.google.com/file/d/1um39wxIaicmOquP2fr_SiZdxNCUou8w-/view?usp=sharing)|
+| PVT+CPVT-Small| Twins-PCPVT-S | 81.2 | 3.7  | 24.1 | [pcpvt_small.pth](https://drive.google.com/file/d/1TWIx_8M-4y6UOKtbCgm1v-UVQ-_lYe6X/view?usp=sharing)
+| PVT+CPVT-Base | Twins-PCPVT-B | 82.7 | 6.4  | 43.8 | [pcpvt_base.pth](https://drive.google.com/file/d/1BsD3ZRivvPsHoZB1AX-tbirFLtCln8ky/view?usp=sharing)
+| PVT+CPVT-Large| Twins-PCPVT-L | 83.1 | 9.5  | 60.9 | [pcpvt_large.pth](https://drive.google.com/file/d/17xZXOWEcSGs0quBmMEkBYCxjPRYH-L45/view?usp=sharing)
+| ALT-GVT-Small | Twins-SVT-S   | 81.7 | 2.8  | 24   | [alt_gvt_small.pth](https://drive.google.com/file/d/131SVOphM_-SaBytf4kWjo3ony5hpOt4S/view?usp=sharing)|
+| ALT-GVT-Base  | Twins-SVT-B   | 83.2 | 8.3  | 56   | [alt_gvt_base.pth](https://drive.google.com/file/d/1s83To8xgDWY6Ad8VBP3Nx9gqY709rrGu/view?usp=sharing)|
+| ALT-GVT-Large | Twins-SVT-L   | 83.7 | 14.8 | 99.2 | [alt_gvt_large.pth](https://drive.google.com/file/d/1um39wxIaicmOquP2fr_SiZdxNCUou8w-/view?usp=sharing)|
 
 
 
@@ -37,5 +38,8 @@ We provide baseline Twins models pretrained on ImageNet 2012.
 }
 ```
 
+### Acknowledgement
+
+We owe thanks to [PVT](https://github.com/whai362/PVT) and [Swin Transformer](https://github.com/microsoft/Swin-Transformer).
 
 
