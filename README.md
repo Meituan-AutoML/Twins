@@ -12,21 +12,36 @@ Figure 1. Twins-SVT-S Architecture (Right side shows the inside of two consecuti
 
 We provide a series of Twins models pretrained on ILSVRC2012 ImageNet-1K dataset.
 
-| Name | Alias in paper | acc@1 | FLOPs(G)|#params (M) | url |
-| --- | --- | --- | --- | --- |--- |
-| PVT+CPVT-Small| Twins-PCPVT-S | 81.2 | 3.7  | 24.1 | [pcpvt_small.pth](https://drive.google.com/file/d/1TWIx_8M-4y6UOKtbCgm1v-UVQ-_lYe6X/view?usp=sharing)
-| PVT+CPVT-Base | Twins-PCPVT-B | 82.7 | 6.4  | 43.8 | [pcpvt_base.pth](https://drive.google.com/file/d/1BsD3ZRivvPsHoZB1AX-tbirFLtCln8ky/view?usp=sharing)
-| PVT+CPVT-Large| Twins-PCPVT-L | 83.1 | 9.5  | 60.9 | [pcpvt_large.pth](https://drive.google.com/file/d/17xZXOWEcSGs0quBmMEkBYCxjPRYH-L45/view?usp=sharing)
-| ALT-GVT-Small | Twins-SVT-S   | 81.7 | 2.8  | 24   | [alt_gvt_small.pth](https://drive.google.com/file/d/131SVOphM_-SaBytf4kWjo3ony5hpOt4S/view?usp=sharing)|
-| ALT-GVT-Base  | Twins-SVT-B   | 83.2 | 8.3  | 56   | [alt_gvt_base.pth](https://drive.google.com/file/d/1s83To8xgDWY6Ad8VBP3Nx9gqY709rrGu/view?usp=sharing)|
-| ALT-GVT-Large | Twins-SVT-L   | 83.7 | 14.8 | 99.2 | [alt_gvt_large.pth](https://drive.google.com/file/d/1um39wxIaicmOquP2fr_SiZdxNCUou8w-/view?usp=sharing)|
+| Name | Alias in paper | acc@1 | FLOPs(G)|#params (M) | url | log|
+| --- | --- | --- | --- | --- |--- |---|
+| PVT+CPVT-Small| Twins-PCPVT-S | 81.2 | 3.7  | 24.1 | [pcpvt_small.pth](https://drive.google.com/file/d/1TWIx_8M-4y6UOKtbCgm1v-UVQ-_lYe6X/view?usp=sharing) | pcpvt_s(/logs/pcpvt_s.txt)
+| PVT+CPVT-Base | Twins-PCPVT-B | 82.7 | 6.4  | 43.8 | [pcpvt_base.pth](https://drive.google.com/file/d/1BsD3ZRivvPsHoZB1AX-tbirFLtCln8ky/view?usp=sharing) | pcpvt_b(/logs/pcpvt_b.txt)
+| PVT+CPVT-Large| Twins-PCPVT-L | 83.1 | 9.5  | 60.9 | [pcpvt_large.pth](https://drive.google.com/file/d/17xZXOWEcSGs0quBmMEkBYCxjPRYH-L45/view?usp=sharing) | pcpvt_l(/logs/pcpvt_l.txt)
+| ALT-GVT-Small | Twins-SVT-S   | 81.7 | 2.8  | 24   | [alt_gvt_small.pth](https://drive.google.com/file/d/131SVOphM_-SaBytf4kWjo3ony5hpOt4S/view?usp=sharing) |svt_s(/logs/svt_s.txt)
+| ALT-GVT-Base  | Twins-SVT-B   | 83.2 | 8.3  | 56   | [alt_gvt_base.pth](https://drive.google.com/file/d/1s83To8xgDWY6Ad8VBP3Nx9gqY709rrGu/view?usp=sharing)|svt_b(/logs/svt_b.txt)
+| ALT-GVT-Large | Twins-SVT-L   | 83.7 | 14.8 | 99.2 | [alt_gvt_large.pth](https://drive.google.com/file/d/1um39wxIaicmOquP2fr_SiZdxNCUou8w-/view?usp=sharing)|svt_l(/logs/svt_l.txt)
 
+#### Training
+To train Twins-SVT-B on ImageNet  using 8 gpus for 300 epochs run:
 
+```python
+ python -m torch.distributed.launch --nproc_per_node=8 --use_env main.py --model alt_gvt_base --batch-size 128 --data-path path_to_imagenet --dist-eval --drop-path 0.3
+```
+#### Evaluation 
+To evaluate the performance of Twins-SVT-L on ImageNet using one GPU.
+```python
+python main.py --eval --resume alt_gvt_large.pth  --model alt_gvt_large --data-path path_to_imagenet
+```
+This should give
+```
+* Acc@1 83.650 Acc@5 96.530 loss 0.718
+Accuracy of the network on the 50000 test images: 83.7%
+Max accuracy: 83.67%
+```
 
-^ Note: Our code will be released soon.
-
-
-### Citation
+## ToDo
+Detection and segmentation.
+## Citation
 
 ```
 @article{chu2021Twins,
@@ -38,8 +53,10 @@ We provide a series of Twins models pretrained on ILSVRC2012 ImageNet-1K dataset
 }
 ```
 
-### Acknowledgement
+## Acknowledgement
 
-We owe thanks to [DeiT](https://github.com/facebookresearch/deit), [PVT](https://github.com/whai362/PVT) and [Swin Transformer](https://github.com/microsoft/Swin-Transformer).
+We heavily borrow the code from    [DeiT](https://github.com/facebookresearch/deit) and [PVT](https://github.com/whai362/PVT).
+We test throughouts using  [Swin Transformer](https://github.com/microsoft/Swin-Transformer).
 
-
+## License
+This repository is released under the Apache 2.0 license as found in the [LICENSE](LICENSE) file.
