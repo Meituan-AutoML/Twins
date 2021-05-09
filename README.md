@@ -10,7 +10,7 @@ Figure 1. Twins-SVT-S Architecture (Right side shows the inside of two consecuti
 
 ### Image Classification
 
-We provide baseline Twins models pretrained on ImageNet 2012.
+We provide a series of Twins models pretrained on ILSVRC2012 ImageNet-1K dataset.
 
 | Name | Alias in paper | acc@1 | FLOPs(G)|#params (M) | url |
 | --- | --- | --- | --- | --- |--- |
@@ -40,6 +40,6 @@ We provide baseline Twins models pretrained on ImageNet 2012.
 
 ### Acknowledgement
 
-We owe thanks to [PVT](https://github.com/whai362/PVT) and [Swin Transformer](https://github.com/microsoft/Swin-Transformer).
+We owe thanks to [DeiT](https://github.com/facebookresearch/deit), [PVT](https://github.com/whai362/PVT) and [Swin Transformer](https://github.com/microsoft/Swin-Transformer).
 
 
