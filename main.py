@@ -17,6 +17,7 @@ from timm.utils import NativeScaler, get_state_dict, ModelEma
 
 from datasets import build_dataset
 from engine import train_one_epoch, evaluate
+from losses import DistillationLoss
 from samplers import RASampler
 import gvt
 import utils
@@ -275,6 +276,10 @@ def main(args):
         criterion = LabelSmoothingCrossEntropy(smoothing=args.smoothing)
     else:
         criterion = torch.nn.CrossEntropyLoss()
+
+    criterion = DistillationLoss(
+        criterion, None, 'none', 0, 0
+    )
 
     if not args.output_dir:
         args.output_dir = args.model

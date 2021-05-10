@@ -40,9 +40,8 @@ python main.py --eval --resume alt_gvt_large.pth  --model alt_gvt_large --data-p
 This should give
 
 ```
-* Acc@1 83.650 Acc@5 96.530 loss 0.718
+* Acc@1 83.660 Acc@5 96.512 loss 0.722
 Accuracy of the network on the 50000 test images: 83.7%
-Max accuracy: 83.67%
 ```
 
 ## Todo
