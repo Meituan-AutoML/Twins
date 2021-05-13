@@ -6,6 +6,9 @@ from functools import partial
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 from timm.models.registry import register_model
 from timm.models.vision_transformer import _cfg
+from mmseg.models.builder import BACKBONES
+from mmseg.utils import get_root_logger
+from mmcv.runner import load_checkpoint
 from timm.models.vision_transformer import Block as TimmBlock
 from timm.models.vision_transformer import Attention as TimmAttention
 
@@ -30,11 +33,10 @@ class Mlp(nn.Module):
 
 
 class GroupAttention(nn.Module):
-    """
-    LSA: self attention within a group
-    """
-    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0., ws=1):
-        assert ws != 1
+    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0., ws=1, sr_ratio=1.0):
+        """
+        ws 1 for stand attention
+        """
         super(GroupAttention, self).__init__()
         assert dim % num_heads == 0, f"dim {dim} should be divided by num_heads {num_heads}."
 
@@ -43,6 +45,8 @@ class GroupAttention(nn.Module):
         head_dim = dim // num_heads
         self.scale = qk_scale or head_dim ** -0.5
 
+        # self.q = nn.Linear(dim, dim, bias=qkv_bias)
+        # self.kv = nn.Linear(dim, dim * 2, bias=qkv_bias)
         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
         self.attn_drop = nn.Dropout(attn_drop)
         self.proj = nn.Linear(dim, dim)
@@ -50,31 +54,80 @@ class GroupAttention(nn.Module):
         self.ws = ws
 
     def forward(self, x, H, W):
+        """
+        There are two implementations for this function, zero padding or mask. We don't observe obvious difference for
+        both. You can choose any one, we recommend forward_padding because it's neat. However,
+        the masking implementation is more reasonable and accurate.
+        Args:
+            x:
+            H:
+            W:
+
+        Returns:
+
+        """
+        return self.forward_mask(x, H, W)
+
+    def forward_mask(self, x, H, W):
         B, N, C = x.shape
-        h_group, w_group = H // self.ws, W // self.ws
+        x = x.view(B, H, W, C)
+        pad_l = pad_t = 0
+        pad_r = (self.ws - W % self.ws) % self.ws
+        pad_b = (self.ws - H % self.ws) % self.ws
+        x = F.pad(x, (0, 0, pad_l, pad_r, pad_t, pad_b))
+        _, Hp, Wp, _ = x.shape
+        _h, _w = Hp // self.ws, Wp // self.ws
+        mask = torch.zeros((1, Hp, Wp), device=x.device)
+        mask[:, -pad_b:, :].fill_(1)
+        mask[:, :, -pad_r:].fill_(1)
 
-        total_groups = h_group * w_group
-
-        x = x.reshape(B, h_group, self.ws, w_group, self.ws, C).transpose(2, 3)
-
-        qkv = self.qkv(x).reshape(B, total_groups, -1, 3, self.num_heads, C // self.num_heads).permute(3, 0, 1, 4, 2, 5)
-        # B, hw, ws*ws, 3, n_head, head_dim -> 3, B, hw, n_head, ws*ws, head_dim
-        q, k, v = qkv[0], qkv[1], qkv[2]  # B, hw, n_head, ws*ws, head_dim
-        attn = (q @ k.transpose(-2, -1)) * self.scale  # B, hw, n_head, ws*ws, ws*ws
+        x = x.reshape(B, _h, self.ws, _w, self.ws, C).transpose(2, 3)  # B, _h, _w, ws, ws, C
+        mask = mask.reshape(1, _h, self.ws, _w, self.ws).transpose(2, 3).reshape(1,  _h*_w, self.ws*self.ws)
+        attn_mask = mask.unsqueeze(2) - mask.unsqueeze(3)  # 1, _h*_w, ws*ws, ws*ws
+        attn_mask = attn_mask.masked_fill(attn_mask != 0, float(-1000.0)).masked_fill(attn_mask == 0, float(0.0))
+        qkv = self.qkv(x).reshape(B, _h * _w, self.ws * self.ws, 3, self.num_heads,
+                                            C // self.num_heads).permute(3, 0, 1, 4, 2, 5) # n_h, B, _w*_h, nhead, ws*ws, dim
+        q, k, v = qkv[0], qkv[1], qkv[2]  # B, _h*_w, n_head, ws*ws, dim_head
+        attn = (q @ k.transpose(-2, -1)) * self.scale  # B, _h*_w, n_head, ws*ws, ws*ws
+        attn = attn + attn_mask.unsqueeze(2)
         attn = attn.softmax(dim=-1)
-        attn = self.attn_drop(
-            attn)  # attn @ v-> B, hw, n_head, ws*ws, head_dim -> (t(2,3)) B, hw, ws*ws, n_head,  head_dim
-        attn = (attn @ v).transpose(2, 3).reshape(B, h_group, w_group, self.ws, self.ws, C)
-        x = attn.transpose(2, 3).reshape(B, N, C)
+        attn = self.attn_drop(attn)  # attn @v ->  B, _h*_w, n_head, ws*ws, dim_head
+        attn = (attn @ v).transpose(2, 3).reshape(B, _h, _w, self.ws, self.ws, C)
+        x = attn.transpose(2, 3).reshape(B, _h * self.ws, _w * self.ws, C)
+        if pad_r > 0 or pad_b > 0:
+            x = x[:, :H, :W, :].contiguous()
+        x = x.reshape(B, N, C)
+        x = self.proj(x)
+        x = self.proj_drop(x)
+        return x
+
+    def forward_padding(self, x, H, W):
+        B, N, C = x.shape
+        x = x.view(B, H, W, C)
+        pad_l = pad_t = 0
+        pad_r = (self.ws - W % self.ws) % self.ws
+        pad_b = (self.ws - H % self.ws) % self.ws
+        x = F.pad(x, (0, 0, pad_l, pad_r, pad_t, pad_b))
+        _, Hp, Wp, _ = x.shape
+        _h, _w = Hp // self.ws, Wp // self.ws
+        x = x.reshape(B, _h, self.ws, _w, self.ws, C).transpose(2, 3)
+        qkv = self.qkv(x).reshape(B, _h * _w, self.ws * self.ws, 3, self.num_heads,
+                                            C // self.num_heads).permute(3, 0, 1, 4, 2, 5)
+        q, k, v = qkv[0], qkv[1], qkv[2]
+        attn = (q @ k.transpose(-2, -1)) * self.scale
+        attn = attn.softmax(dim=-1)
+        attn = self.attn_drop(attn)
+        attn = (attn @ v).transpose(2, 3).reshape(B, _h, _w, self.ws, self.ws, C)
+        x = attn.transpose(2, 3).reshape(B, _h * self.ws, _w * self.ws, C)
+        if pad_r > 0 or pad_b > 0:
+            x = x[:, :H, :W, :].contiguous()
+        x = x.reshape(B, N, C)
         x = self.proj(x)
         x = self.proj_drop(x)
         return x
 
 
 class Attention(nn.Module):
-    """
-    GSA: using a  key to summarize the information for a group to be efficient.
-    """
     def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0., sr_ratio=1):
         super().__init__()
         assert dim % num_heads == 0, f"dim {dim} should be divided by num_heads {num_heads}."
@@ -129,6 +182,7 @@ class Block(nn.Module):
             dim,
             num_heads=num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale,
             attn_drop=attn_drop, proj_drop=drop, sr_ratio=sr_ratio)
+        # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
@@ -196,13 +250,13 @@ class PatchEmbed(nn.Module):
         return x, (H, W)
 
 
-# borrow from PVT https://github.com/whai362/PVT.git
 class PyramidVisionTransformer(nn.Module):
     def __init__(self, img_size=224, patch_size=16, in_chans=3, num_classes=1000, embed_dims=[64, 128, 256, 512],
                  num_heads=[1, 2, 4, 8], mlp_ratios=[4, 4, 4, 4], qkv_bias=False, qk_scale=None, drop_rate=0.,
                  attn_drop_rate=0., drop_path_rate=0., norm_layer=nn.LayerNorm,
                  depths=[3, 4, 6, 3], sr_ratios=[8, 4, 2, 1], block_cls=Block):
         super().__init__()
+        print('drop_path_rate: --- ', drop_path_rate)
         self.num_classes = num_classes
         self.depths = depths
 
@@ -216,19 +270,17 @@ class PyramidVisionTransformer(nn.Module):
             if i == 0:
                 self.patch_embeds.append(PatchEmbed(img_size, patch_size, in_chans, embed_dims[i]))
             else:
-                self.patch_embeds.append(
-                    PatchEmbed(img_size // patch_size // 2 ** (i - 1), 2, embed_dims[i - 1], embed_dims[i]))
-            patch_num = self.patch_embeds[-1].num_patches + 1 if i == len(embed_dims) - 1 else self.patch_embeds[
-                -1].num_patches
+                self.patch_embeds.append(PatchEmbed(img_size // patch_size // 2**(i-1), 2, embed_dims[i-1], embed_dims[i]))
+            patch_num = self.patch_embeds[-1].num_patches + 1 if i == len(embed_dims) -1 else self.patch_embeds[-1].num_patches
             self.pos_embeds.append(nn.Parameter(torch.zeros(1, patch_num, embed_dims[i])))
             self.pos_drops.append(nn.Dropout(p=drop_rate))
 
+        # transformer encoder
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]  # stochastic depth decay rule
         cur = 0
         for k in range(len(depths)):
             _block = nn.ModuleList([block_cls(
-                dim=embed_dims[k], num_heads=num_heads[k], mlp_ratio=mlp_ratios[k], qkv_bias=qkv_bias,
-                qk_scale=qk_scale,
+                dim=embed_dims[k], num_heads=num_heads[k], mlp_ratio=mlp_ratios[k], qkv_bias=qkv_bias, qk_scale=qk_scale,
                 drop=drop_rate, attn_drop=attn_drop_rate, drop_path=dpr[cur + i], norm_layer=norm_layer,
                 sr_ratio=sr_ratios[k])
                 for i in range(depths[k])])
@@ -265,8 +317,19 @@ class PyramidVisionTransformer(nn.Module):
             nn.init.constant_(m.bias, 0)
             nn.init.constant_(m.weight, 1.0)
 
+    def init_weights(self, pretrained=None):
+        if isinstance(pretrained, str):
+            self.apply(self._init_weights)
+            logger = get_root_logger()
+            load_checkpoint(self, pretrained, map_location='cpu', strict=False, logger=logger)
+        elif pretrained is None:
+            self.apply(self._init_weights)
+        else:
+            raise TypeError('pretrained must be a str or None')
+
     @torch.jit.ignore
     def no_weight_decay(self):
+        # return {'pos_embed', 'cls_token'} # has pos_embed may be better
         return {'cls_token'}
 
     def get_classifier(self):
@@ -301,11 +364,10 @@ class PyramidVisionTransformer(nn.Module):
         return x
 
 
-# PEG  from https://arxiv.org/abs/2102.10882
 class PosCNN(nn.Module):
     def __init__(self, in_chans, embed_dim=768, s=1):
         super(PosCNN, self).__init__()
-        self.proj = nn.Sequential(nn.Conv2d(in_chans, embed_dim, 3, s, 1, bias=True, groups=embed_dim), )
+        self.proj = nn.Sequential(nn.Conv2d(in_chans, embed_dim, 3, s, 1, bias=True, groups=embed_dim))
         self.s = s
 
     def forward(self, x, H, W):
@@ -324,19 +386,19 @@ class PosCNN(nn.Module):
 
 
 class CPVTV2(PyramidVisionTransformer):
-    """
-    Use useful results from CPVT. PEG and GAP.
-    Therefore, cls token is no longer required.
-    PEG is used to encode the absolute position on the fly, which greatly affects the performance when input resolution
-    changes during the training (such as segmentation, detection)
-    """
     def __init__(self, img_size=224, patch_size=4, in_chans=3, num_classes=1000, embed_dims=[64, 128, 256, 512],
                  num_heads=[1, 2, 4, 8], mlp_ratios=[4, 4, 4, 4], qkv_bias=False, qk_scale=None, drop_rate=0.,
                  attn_drop_rate=0., drop_path_rate=0., norm_layer=nn.LayerNorm,
-                 depths=[3, 4, 6, 3], sr_ratios=[8, 4, 2, 1], block_cls=Block):
+                 depths=[3, 4, 6, 3], sr_ratios=[8, 4, 2, 1], block_cls=Block, F4=False, extra_norm=False):
         super(CPVTV2, self).__init__(img_size, patch_size, in_chans, num_classes, embed_dims, num_heads, mlp_ratios,
                                      qkv_bias, qk_scale, drop_rate, attn_drop_rate, drop_path_rate, norm_layer, depths,
                                      sr_ratios, block_cls)
+        self.F4 = F4
+        self.extra_norm = extra_norm
+        if self.extra_norm:
+            self.norm_list = nn.ModuleList()
+            for dim in embed_dims:
+                self.norm_list.append(norm_layer(dim))
         del self.pos_embeds
         del self.cls_token
         self.pos_block = nn.ModuleList(
@@ -367,6 +429,8 @@ class CPVTV2(PyramidVisionTransformer):
         return set(['cls_token'] + ['pos_block.' + n for n, p in self.pos_block.named_parameters()])
 
     def forward_features(self, x):
+        outputs = list()
+
         B = x.shape[0]
 
         for i in range(len(self.depths)):
@@ -375,51 +439,95 @@ class CPVTV2(PyramidVisionTransformer):
             for j, blk in enumerate(self.blocks[i]):
                 x = blk(x, H, W)
                 if j == 0:
-                    x = self.pos_block[i](x, H, W)  # PEG here
-            if i < len(self.depths) - 1:
-                x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
+                    x = self.pos_block[i](x, H, W)
+            if self.extra_norm:
+                x = self.norm_list[i](x)
+            x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
 
-        x = self.norm(x)
+            outputs.append(x)
 
-        return x.mean(dim=1)  # GAP here
+        return outputs
+
+    def forward(self, x):
+        x = self.forward_features(x)
+
+        if self.F4:
+            x = x[3:4]
+
+        return x
 
 
 class PCPVT(CPVTV2):
     def __init__(self, img_size=224, patch_size=4, in_chans=3, num_classes=1000, embed_dims=[64, 128, 256],
                  num_heads=[1, 2, 4], mlp_ratios=[4, 4, 4], qkv_bias=False, qk_scale=None, drop_rate=0.,
                  attn_drop_rate=0., drop_path_rate=0., norm_layer=nn.LayerNorm,
-                 depths=[4, 4, 4], sr_ratios=[4, 2, 1], block_cls=SBlock):
+                 depths=[4, 4, 4], sr_ratios=[4, 2, 1], block_cls=SBlock, F4=False, extra_norm=False):
         super(PCPVT, self).__init__(img_size, patch_size, in_chans, num_classes, embed_dims, num_heads,
                                     mlp_ratios, qkv_bias, qk_scale, drop_rate, attn_drop_rate, drop_path_rate,
-                                    norm_layer, depths, sr_ratios, block_cls)
+                                    norm_layer, depths, sr_ratios, block_cls, F4, extra_norm)
 
 
 class ALTGVT(PCPVT):
-    """
-    alias Twins-SVT
-    """
     def __init__(self, img_size=224, patch_size=4, in_chans=3, num_classes=1000, embed_dims=[64, 128, 256],
                  num_heads=[1, 2, 4], mlp_ratios=[4, 4, 4], qkv_bias=False, qk_scale=None, drop_rate=0.,
-                 attn_drop_rate=0., drop_path_rate=0., norm_layer=nn.LayerNorm,
-                 depths=[4, 4, 4], sr_ratios=[4, 2, 1], block_cls=GroupBlock, wss=[7, 7, 7]):
+                 attn_drop_rate=0., drop_path_rate=0.2, norm_layer=nn.LayerNorm,
+                 depths=[4, 4, 4], sr_ratios=[4, 2, 1], block_cls=GroupBlock, wss=[7, 7, 7],
+                 F4=False, extra_norm=False, strides=(2, 2, 2)):
         super(ALTGVT, self).__init__(img_size, patch_size, in_chans, num_classes, embed_dims, num_heads,
-                                     mlp_ratios, qkv_bias, qk_scale, drop_rate, attn_drop_rate, drop_path_rate,
-                                     norm_layer, depths, sr_ratios, block_cls)
+                                    mlp_ratios, qkv_bias, qk_scale, drop_rate, attn_drop_rate, drop_path_rate,
+                                    norm_layer, depths, sr_ratios, block_cls, F4)
         del self.blocks
         self.wss = wss
+        self.extra_norm = extra_norm
+        self.strides = strides
+        if self.extra_norm:
+            self.norm_list = nn.ModuleList()
+            for dim in embed_dims:
+                self.norm_list.append(norm_layer(dim))
         # transformer encoder
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]  # stochastic depth decay rule
         cur = 0
         self.blocks = nn.ModuleList()
         for k in range(len(depths)):
             _block = nn.ModuleList([block_cls(
-                dim=embed_dims[k], num_heads=num_heads[k], mlp_ratio=mlp_ratios[k], qkv_bias=qkv_bias,
-                qk_scale=qk_scale,
+                dim=embed_dims[k], num_heads=num_heads[k], mlp_ratio=mlp_ratios[k], qkv_bias=qkv_bias, qk_scale=qk_scale,
                 drop=drop_rate, attn_drop=attn_drop_rate, drop_path=dpr[cur + i], norm_layer=norm_layer,
                 sr_ratio=sr_ratios[k], ws=1 if i % 2 == 1 else wss[k]) for i in range(depths[k])])
             self.blocks.append(_block)
             cur += depths[k]
+
+        if strides != (2, 2, 2):
+            del self.patch_embeds
+            self.patch_embeds = nn.ModuleList()
+            s = 1
+            for i in range(len(depths)):
+                if i == 0:
+                    self.patch_embeds.append(PatchEmbed(img_size, patch_size, in_chans, embed_dims[i]))
+                else:
+                    self.patch_embeds.append(
+                        PatchEmbed(img_size // patch_size // s, strides[i-1], embed_dims[i - 1], embed_dims[i]))
+                s = s * strides[i-1]
+
         self.apply(self._init_weights)
+
+    def forward_features(self, x):
+        outputs = list()
+
+        B = x.shape[0]
+
+        for i in range(len(self.depths)):
+            x, (H, W) = self.patch_embeds[i](x)
+            x = self.pos_drops[i](x)
+            for j, blk in enumerate(self.blocks[i]):
+                x = blk(x, H, W)
+                if j == 0:
+                    x = self.pos_block[i](x, H, W)
+            if self.extra_norm:
+                x = self.norm_list[i](x)
+            x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
+            outputs.append(x)
+
+        return outputs
 
 
 def _conv_filter(state_dict, patch_size=16):
@@ -433,64 +541,59 @@ def _conv_filter(state_dict, patch_size=16):
     return out_dict
 
 
-@register_model
-def pcpvt_small_v0(pretrained=False, **kwargs):
-    model = CPVTV2(
-        patch_size=4, embed_dims=[64, 128, 320, 512], num_heads=[1, 2, 5, 8], mlp_ratios=[8, 8, 4, 4], qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[3, 4, 6, 3], sr_ratios=[8, 4, 2, 1],
-        **kwargs)
-    model.default_cfg = _cfg()
-    return model
+@BACKBONES.register_module()
+class pcpvt_small_v0(CPVTV2):
+    def __init__(self, **kwargs):
+        super(pcpvt_small_v0, self).__init__(
+            patch_size=4, embed_dims=[64, 128, 320, 512], num_heads=[1, 2, 5, 8], mlp_ratios=[8, 8, 4, 4],
+            qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[3, 4, 6, 3], sr_ratios=[8, 4, 2, 1],
+            drop_rate=0.0, drop_path_rate=0.2)
 
 
-@register_model
-def pcpvt_base_v0(pretrained=False, **kwargs):
-    model = CPVTV2(
-        patch_size=4, embed_dims=[64, 128, 320, 512], num_heads=[1, 2, 5, 8], mlp_ratios=[8, 8, 4, 4], qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[3, 4, 18, 3], sr_ratios=[8, 4, 2, 1],
-        **kwargs)
-    model.default_cfg = _cfg()
-    return model
+@BACKBONES.register_module()
+class pcpvt_base_v0(CPVTV2):
+    def __init__(self, **kwargs):
+        super(pcpvt_base_v0, self).__init__(
+            patch_size=4, embed_dims=[64, 128, 320, 512], num_heads=[1, 2, 5, 8], mlp_ratios=[8, 8, 4, 4],
+            qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[3, 4, 18, 3], sr_ratios=[8, 4, 2, 1],
+            drop_rate=0.0, drop_path_rate=0.2)
 
 
-@register_model
-def pcpvt_large_v0(pretrained=False, **kwargs):
-    model = CPVTV2(
-        patch_size=4, embed_dims=[64, 128, 320, 512], num_heads=[1, 2, 5, 8], mlp_ratios=[8, 8, 4, 4], qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[3, 8, 27, 3], sr_ratios=[8, 4, 2, 1],
-        **kwargs)
-    model.default_cfg = _cfg()
-    return model
+@BACKBONES.register_module()
+class pcpvt_large(CPVTV2):
+    def __init__(self, **kwargs):
+        super(pcpvt_large, self).__init__(
+            patch_size=4, embed_dims=[64, 128, 320, 512], num_heads=[1, 2, 5, 8], mlp_ratios=[8, 8, 4, 4], qkv_bias=True,
+            norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[3, 8, 27, 3], sr_ratios=[8, 4, 2, 1],
+            drop_rate=0.0, drop_path_rate=0.2)
 
 
-@register_model
-def alt_gvt_small(pretrained=False, **kwargs):
-    model = ALTGVT(
-        patch_size=4, embed_dims=[64, 128, 256, 512], num_heads=[2, 4, 8, 16], mlp_ratios=[4, 4, 4, 4], qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[2, 2, 10, 4], wss=[7, 7, 7, 7], sr_ratios=[8, 4, 2, 1],
-        **kwargs)
-    model.default_cfg = _cfg()
-    return model
+@BACKBONES.register_module()
+class alt_gvt_small(ALTGVT):
+    def __init__(self, **kwargs):
+        super(alt_gvt_small, self).__init__(
+            patch_size=4, embed_dims=[64, 128, 256, 512], num_heads=[2, 4, 8, 16], mlp_ratios=[4, 4, 4, 4], qkv_bias=True,
+            norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[2, 2, 10, 4], wss=[7, 7, 7, 7], sr_ratios=[8, 4, 2, 1],
+            extra_norm=True, drop_path_rate=0.2,
+        )
 
 
-@register_model
-def alt_gvt_base(pretrained=False, **kwargs):
-    model = ALTGVT(
-        patch_size=4, embed_dims=[96, 192, 384, 768], num_heads=[3, 6, 12, 24], mlp_ratios=[4, 4, 4, 4], qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[2, 2, 18, 2], wss=[7, 7, 7, 7], sr_ratios=[8, 4, 2, 1],
-        **kwargs)
+@BACKBONES.register_module()
+class alt_gvt_base(ALTGVT):
+    def __init__(self, **kwargs):
+        super(alt_gvt_base, self).__init__(
+            patch_size=4, embed_dims=[96, 192, 384, 768], num_heads=[3, 6, 12, 24], mlp_ratios=[4, 4, 4, 4], qkv_bias=True,
+            norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[2, 2, 18, 2], wss=[7, 7, 7, 7], sr_ratios=[8, 4, 2, 1],
+            extra_norm=True, drop_path_rate=0.2,
+        )
 
-    model.default_cfg = _cfg()
-    return model
 
+@BACKBONES.register_module()
+class alt_gvt_large(ALTGVT):
+    def __init__(self, **kwargs):
+        super(alt_gvt_large, self).__init__(
+            patch_size=4, embed_dims=[128, 256, 512, 1024], num_heads=[4, 8, 16, 32], mlp_ratios=[4, 4, 4, 4], qkv_bias=True,
+            norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[2, 2, 18, 2], wss=[7, 7, 7, 7], sr_ratios=[8, 4, 2, 1],
+            extra_norm=True, drop_path_rate=0.3,
+        )
 
-@register_model
-def alt_gvt_large(pretrained=False, **kwargs):
-    model = ALTGVT(
-        patch_size=4, embed_dims=[128, 256, 512, 1024], num_heads=[4, 8, 16, 32], mlp_ratios=[4, 4, 4, 4],
-        qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[2, 2, 18, 2], wss=[7, 7, 7, 7], sr_ratios=[8, 4, 2, 1],
-        **kwargs)
-
-    model.default_cfg = _cfg()
-    return model

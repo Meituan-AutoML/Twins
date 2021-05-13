@@ -23,7 +23,7 @@ We provide a series of Twins models pretrained on ILSVRC2012 ImageNet-1K dataset
 
 #### Training
 
-To train Twins-SVT-B on ImageNet  using 8 gpus for 300 epochs run:
+To train Twins-SVT-B on ImageNet  using 8 gpus for 300 epochs, run
 
 ```python
 python -m torch.distributed.launch --nproc_per_node=8 --use_env main.py --model alt_gvt_base --batch-size 128 --data-path path_to_imagenet --dist-eval --drop-path 0.3
@@ -31,7 +31,7 @@ python -m torch.distributed.launch --nproc_per_node=8 --use_env main.py --model 
 
 #### Evaluation 
 
-To evaluate the performance of Twins-SVT-L on ImageNet using one GPU.
+To evaluate the performance of Twins-SVT-L on ImageNet using one GPU, run
 
 ```python
 python main.py --eval --resume alt_gvt_large.pth  --model alt_gvt_large --data-path path_to_imagenet
@@ -45,6 +45,8 @@ Accuracy of the network on the 50000 test images: 83.7%
 ```
 ### Semantic Segmentation
 
+Our code are based on [mmsegmentation](https://github.com/open-mmlab/mmsegmentation).
+
 We provide a series of Twins models and training logs trained on Ade20k dataset.
 
 | Model | Alias in the paper | mIoU(ss/ms) | FLOPs(G)|#Params (M) | URL | Log |
@@ -56,12 +58,28 @@ We provide a series of Twins models and training logs trained on Ade20k dataset.
 | ALTGVT-Base  | Twins-SVT-B   | 47.4/48.9 | 1020  | 88.5   | [alt_gvt_base.pth](https://drive.google.com/file/d/1LNtdvACihmKO6XyBPoJDxbrd6AuHVVvq/view?usp=sharing)|[svt_b.txt](/logs/upernet_svt_b.txt)
 | ALTGVT-Large | Twins-SVT-L   | 48.8/50.2 | 1164 | 133 | [alt_gvt_large.pth](https://drive.google.com/file/d/1xS91hytfzuMZ5Rgb-W-cOJ9G7ptjVwlO/view?usp=sharing)|[svt_l.txt](/logs/upernet_svt_l.txt)
 
+#### Training
+To train Twins-PCPVT-Large on Ade20k  using 8 gpus for 160k iterations, run
 
+```bash
+ bash dist_train.sh configs/upernet_pcpvt_l_512x512_160k_ade20k_swin_setting.py 8
+```
+
+#### Evaluation
+To evaluate Twins-PCPVT-Large on Ade20k  using 8 gpus for 160k iterations (single scale), run
+```bash
+bash dist_test.sh configs/upernet_pcpvt_l_512x512_160k_ade20k_swin_setting.py checkpoint_file 8 --eval mIoU
+```
+To evaluate Twins-PCPVT-Large on Ade20k  using 8 gpus for 160k iterations (multi scale), run
+```bash
+bash dist_test.sh configs/upernet_pcpvt_l_512x512_160k_ade20k_swin_setting.py checkpoint_file 8 --eval mIoU --aug-test
+```
 ## Todo
 
-- [] Detection and segmentation.
+- [] Detection
 
 ## Citation
+If you find this project useful in your research, please consider cite:
 
 ```
 @article{chu2021Twins,
