@@ -5,7 +5,38 @@ Very recently, a variety of vision transformer architectures for dense predictio
 
 ![Twins-SVT-S](twins_svt_s.png)
 Figure 1. Twins-SVT-S Architecture (Right side shows the inside of two consecutive Transformer Encoders).
+Then, install PyTorch 1.7.0+ and torchvision 0.8.1+ and pytorch-image-models 0.3.2:
 
+# Usage
+
+First, clone the repository locally:
+```
+git clone https://github.com/Meituan-AutoML/Twins.git
+```
+Then, install PyTorch 1.7.0+ and torchvision 0.8.1+ and [pytorch-image-models==0.3.2](https://github.com/rwightman/pytorch-image-models):
+
+```
+conda install -c pytorch pytorch torchvision
+pip install timm==0.3.2
+```
+## Data preparation
+
+Download and extract ImageNet train and val images from http://image-net.org/.
+The directory structure is the standard layout for the torchvision [`datasets.ImageFolder`](https://pytorch.org/docs/stable/torchvision/datasets.html#imagefolder), and the training and validation data is expected to be in the `train/` folder and `val` folder respectively:
+
+```
+/path/to/imagenet/
+  train/
+    class1/
+      img1.jpeg
+    class2/
+      img2.jpeg
+  val/
+    class1/
+      img3.jpeg
+    class/2
+      img4.jpeg
+```
 ## Model Zoo
 
 ### Image Classification
@@ -45,9 +76,10 @@ Accuracy of the network on the 50000 test images: 83.7%
 ```
 ### Semantic Segmentation
 
-Our code are based on [mmsegmentation](https://github.com/open-mmlab/mmsegmentation).
+Our code is based on [mmsegmentation](https://github.com/open-mmlab/mmsegmentation). Please install mmsegmentation first.
 
-We provide a series of Twins models and training logs trained on Ade20k dataset.
+We provide a series of Twins models and training logs trained on the Ade20k dataset. It's  easy to extend it to 
+other datasets and segmentation methods.
 
 | Model | Alias in the paper | mIoU(ss/ms) | FLOPs(G)|#Params (M) | URL | Log |
 | --- | --- | --- | --- | --- |--- |---|
@@ -59,7 +91,7 @@ We provide a series of Twins models and training logs trained on Ade20k dataset.
 | ALTGVT-Large | Twins-SVT-L   | 48.8/50.2 | 1164 | 133 | [alt_gvt_large.pth](https://drive.google.com/file/d/1xS91hytfzuMZ5Rgb-W-cOJ9G7ptjVwlO/view?usp=sharing)|[svt_l.txt](/logs/upernet_svt_l.txt)
 
 #### Training
-To train Twins-PCPVT-Large on Ade20k  using 8 gpus for 160k iterations, run
+To train Twins-PCPVT-Large on Ade20k  using 8 gpus for 160k iterations with a global batch size of 16, run
 
 ```bash
  bash dist_train.sh configs/upernet_pcpvt_l_512x512_160k_ade20k_swin_setting.py 8
@@ -74,9 +106,10 @@ To evaluate Twins-PCPVT-Large on Ade20k  using 8 gpus for 160k iterations (multi
 ```bash
 bash dist_test.sh configs/upernet_pcpvt_l_512x512_160k_ade20k_swin_setting.py checkpoint_file 8 --eval mIoU --aug-test
 ```
-## Todo
 
-- [] Detection
+### Detection
+Coming soon.
+
 
 ## Citation
 If you find this project useful in your research, please consider cite:
