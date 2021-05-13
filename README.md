@@ -43,6 +43,19 @@ This should give
 * Acc@1 83.660 Acc@5 96.512 loss 0.722
 Accuracy of the network on the 50000 test images: 83.7%
 ```
+### Semantic Segmentation
+
+We provide a series of Twins models and training logs trained on Ade20k dataset.
+
+| Model | Alias in the paper | mIoU(ss/ms) | FLOPs(G)|#Params (M) | URL | Log |
+| --- | --- | --- | --- | --- |--- |---|
+| PCPVT-Small| Twins-PCPVT-S | 46.2/47.5 | 919  | 54.6 | [pcpvt_small.pth](https://drive.google.com/file/d/1PkkBULZZUhIkFKq_D9db1DXUIHwIPlvp/view?usp=sharing) | [pcpvt_s.txt](/logs/upernet_pcpvt_s.txt)
+| PCPVT-Base | Twins-PCPVT-B | 47.1/48.4 | 977  | 74.3 | [pcpvt_base.pth]() | [pcpvt_b.txt](/logs/upernet_pcpvt_b.txt)
+| PCPVT-Large| Twins-PCPVT-L | 48.6/49.8 | 1041  | 91.5 | [pcpvt_large.pth](https://drive.google.com/file/d/1wsU9riWBiN22fyfsJCHDFhLyP2c_n8sk/view?usp=sharing) | [pcpvt_l.txt](/logs/upernet_pcpvt_l.txt)
+| ALTGVT-Small | Twins-SVT-S   | 46.2/47.1 | 901  | 54.4   | [alt_gvt_small.pth](https://drive.google.com/file/d/18OhG0sbAJ5okPj0zn-8YTydKG9jS8TUx/view?usp=sharing) |[svt_s.txt](/logs/upernet_svt_s.txt)
+| ALTGVT-Base  | Twins-SVT-B   | 47.4/48.9 | 1020  | 88.5   | [alt_gvt_base.pth](https://drive.google.com/file/d/1LNtdvACihmKO6XyBPoJDxbrd6AuHVVvq/view?usp=sharing)|[svt_b.txt](/logs/upernet_svt_b.txt)
+| ALTGVT-Large | Twins-SVT-L   | 48.8/50.2 | 1164 | 133 | [alt_gvt_large.pth](https://drive.google.com/file/d/1xS91hytfzuMZ5Rgb-W-cOJ9G7ptjVwlO/view?usp=sharing)|[svt_l.txt](/logs/upernet_svt_l.txt)
+
 
 ## Todo
 
