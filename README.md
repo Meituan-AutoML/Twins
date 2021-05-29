@@ -98,18 +98,39 @@ To train Twins-PCPVT-Large on Ade20k  using 8 gpus for 160k iterations with a gl
 ```
 
 #### Evaluation
-To evaluate Twins-PCPVT-Large on Ade20k  using 8 gpus for 160k iterations (single scale), run
+To evaluate Twins-PCPVT-Large on Ade20k  using 8 gpus (single scale), run
 ```bash
 bash dist_test.sh configs/upernet_pcpvt_l_512x512_160k_ade20k_swin_setting.py checkpoint_file 8 --eval mIoU
 ```
-To evaluate Twins-PCPVT-Large on Ade20k  using 8 gpus for 160k iterations (multi scale), run
+To evaluate Twins-PCPVT-Large on Ade20k  using 8 gpus (multi scale), run
 ```bash
 bash dist_test.sh configs/upernet_pcpvt_l_512x512_160k_ade20k_swin_setting.py checkpoint_file 8 --eval mIoU --aug-test
 ```
 
 ### Detection
-Coming soon.
+Our code is based on  [mmdetection](https://github.com/open-mmlab/mmdetection). Please install [mmdetection](https://github.com/open-mmlab/mmdetection/blob/master/docs/get_started.md) first (we use v2.8.0).
+We use both Mask R-CNN and RetinaNet to evaluate our method. It's easy to apply Twins in other detectors provided by mmdetection based on our examples.
 
+#### Training
+To train Twins-SVT-Small on COCO  with 8 gpus for 1x schedule (PVT setting) under the framework of Mask R-CNN, run
+
+```bash
+ bash dist_train.sh configs/mask_rcnn_alt_gvt_s_fpn_1x_coco_pvt_setting.py 8
+```
+
+To train Twins-SVT-Small on COCO  with 8 gpus for 3x schedule (Swin setting) under the framework of Mask R-CNN, run
+
+```bash
+ bash dist_train.sh configs/mask_rcnn_alt_gvt_s_fpn_3x_coco_swin_setting.py 8
+```
+
+#### Evaluation
+
+To evaluate the mAP of Twins-SVT-Small on COCO  using 8 gpus based on  the Retina framework, run
+```bash
+bash dist_test.sh configs/retinanet_alt_gvt_s_fpn_1x_coco_pvt_setting.py checkpoint_file 8   --eval mAP
+
+```
 
 ## Citation
 If you find this project useful in your research, please consider cite:
