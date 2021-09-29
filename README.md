@@ -1,7 +1,8 @@
-# Twins: Revisiting the Design of Spatial Attention in Vision Transformers [[Arxiv]](https://arxiv.org/pdf/2104.13840.pdf)
+# [NeurIPS 2021] Twins: Revisiting the Design of Spatial Attention in Vision Transformers 
 
+Very recently, a variety of vision transformer architectures for dense prediction tasks have been proposed and they show that the design of spatial attention is critical to their success in these tasks. In this work, we revisit the design of the spatial attention and demonstrate that a carefully-devised yet simple spatial attention mechanism performs favourably against the state-of-the-art schemes. As a result, we propose two vision transformer architectures, namely, Twins- PCPVT and Twins-SVT. Our proposed architectures are highly-efficient and easy to implement, only involving matrix multiplications that are highly optimized in modern deep learning frameworks. More importantly, the proposed architectures achieve excellent performance on a wide range of visual tasks including image- level classification as well as dense detection and segmentation. The simplicity and strong performance suggest that our proposed architectures may serve as stronger backbones for many vision tasks. 
 
-Very recently, a variety of vision transformer architectures for dense prediction tasks have been proposed and they show that the design of spatial attention is critical to their success in these tasks. In this work, we revisit the design of the spatial attention and demonstrate that a carefully-devised yet simple spatial attention mechanism performs favourably against the state-of-the-art schemes. As a result, we propose two vision transformer architectures, namely, Twins- PCPVT and Twins-SVT. Our proposed architectures are highly-efficient and easy to implement, only involving matrix multiplications that are highly optimized in modern deep learning frameworks. More importantly, the proposed architectures achieve excellent performance on a wide range of visual tasks including image- level classification as well as dense detection and segmentation. The simplicity and strong performance suggest that our proposed architectures may serve as stronger backbones for many vision tasks.
+For the preprint, please refer [[Arxiv]](https://arxiv.org/pdf/2104.13840.pdf).
 
 ![Twins-SVT-S](twins_svt_s.png)
 Figure 1. Twins-SVT-S Architecture (Right side shows the inside of two consecutive Transformer Encoders).
@@ -136,11 +137,10 @@ bash dist_test.sh configs/retinanet_alt_gvt_s_fpn_1x_coco_pvt_setting.py checkpo
 If you find this project useful in your research, please consider cite:
 
 ```
-@article{chu2021Twins,
+@inproceedings{chu2021Twins,
 	title={Twins: Revisiting the Design of Spatial Attention in Vision Transformers},
 	author={Xiangxiang Chu and Zhi Tian and Yuqing Wang and Bo Zhang and Haibing Ren and Xiaolin Wei and Huaxia Xia and Chunhua Shen},
-	journal={Arxiv preprint 2104.13840},
-	url={https://arxiv.org/pdf/2104.13840.pdf},
+	booktitle={NeurIPS 2021},
 	year={2021}
 }
 ```
