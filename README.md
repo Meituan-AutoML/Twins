@@ -134,7 +134,9 @@ bash dist_test.sh configs/retinanet_alt_gvt_s_fpn_1x_coco_pvt_setting.py checkpo
 ```
 
 ## Citation
-If you find this project useful in your research, please consider cite:
+If you find this project useful in your research, please consider cite the following, 
+
+Twins:
 
 ```
 @inproceedings{chu2021Twins,
@@ -142,6 +144,15 @@ If you find this project useful in your research, please consider cite:
 	author={Xiangxiang Chu and Zhi Tian and Yuqing Wang and Bo Zhang and Haibing Ren and Xiaolin Wei and Huaxia Xia and Chunhua Shen},
 	booktitle={NeurIPS 2021},
 	year={2021}
+}
+```
+CPVT:
+```
+@inproceedings{chu2023CPVT,
+	title={Conditional Positional Encodings for Vision Transformers},
+	author={Xiangxiang Chu and Zhi Tian and Bo Zhang and Xinlong Wang and Xiaolin Wei and Huaxia Xia and Chunhua Shen},
+	booktitle={ICLR 2023},
+	year={2023}
 }
 ```
 
@@ -152,3 +163,4 @@ We test throughputs as in [Swin Transformer](https://github.com/microsoft/Swin-T
 
 ## License
 This repository is released under the Apache 2.0 license as found in the [LICENSE](LICENSE) file.
+
